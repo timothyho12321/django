@@ -12,3 +12,7 @@ db.sqlite3-journal
 
 # Node modules #
 node_modules/
+
+
+# Django module #
+django/Lib/site-packages/

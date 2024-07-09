@@ -7,9 +7,14 @@ import os
 from openai import OpenAI
 import requests
 from django.shortcuts import render
-from .forms import SearchForm
-from .models import SearchResults
+from .forms import SearchForm, NoteForm
+from .models import SearchResults, Note, Question
 from dotenv import load_dotenv
+from django.shortcuts import render, redirect
+from django.conf import settings
+import pytesseract
+from pdf2image import convert_from_path
+from PIL import Image
 
 load_dotenv()
 
@@ -42,3 +47,49 @@ def generate_image(request):
     else:
         form = SearchForm()
     return render(request, 'generate_image.html', {'form': form})
+
+
+def upload_note_view(request):
+    if request.method == 'POST':
+        form = NoteForm(request.POST, request.FILES)
+        if form.is_valid():
+            note = form.save()
+            process_note_file(note)
+            return redirect('quiz:generate_questions', note_id=note.id)
+    else:
+        form = NoteForm()
+    return render(request, 'upload_note.html', {'form': form})
+
+def process_note_file(note):
+    text = ''
+    file_path = note.file.path
+    file_ext = os.path.splitext(file_path)[1].lower()
+
+    if file_ext == '.pdf':
+        pages = convert_from_path(file_path, 500)
+        for page in pages:
+            text += pytesseract.image_to_string(page)
+    elif file_ext in ['.jpg', '.jpeg', '.png']:
+        text = pytesseract.image_to_string(Image.open(file_path))
+    elif file_ext in ['.txt']:
+        with open(file_path, 'r') as file:
+            text = file.read()
+
+    generate_questions(note, text)
+
+def generate_questions(note, text):
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=f"Generate multiple-choice questions, true/false questions, and short answer questions based on the following text:\n\n{text}",
+        max_tokens=1000
+    )
+
+    questions_text = response.choices[0].text.strip().split('\n')
+    for question in questions_text:
+        if question.strip():
+            Question.objects.create(note=note, question_text=question.strip(), question_type='Mixed', difficulty='Medium')
+
+def generate_questions_view(request, note_id):
+    note = Note.objects.get(id=note_id)
+    questions = Question.objects.filter(note=note)
+    return render(request, 'generate_questions.html', {'note': note, 'questions': questions})
