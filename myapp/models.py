@@ -17,6 +17,7 @@ class Note(models.Model):
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to='notes/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    question_types = models.ManyToManyField('QuestionType', through='NoteQuestionType')
 
     def __str__(self):
         return self.title
@@ -29,4 +30,14 @@ class Question(models.Model):
 
     def __str__(self):
         return f'{self.question_type}: {self.question_text}'
+    
+class QuestionType(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+    
+class NoteQuestionType(models.Model):
+    note = models.ForeignKey(Note, on_delete=models.CASCADE)
+    question_type = models.ForeignKey(QuestionType, on_delete=models.CASCADE)
 
