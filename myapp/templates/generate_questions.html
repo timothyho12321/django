@@ -5,11 +5,11 @@
 </head>
 <body>
     <h1>Generated Questions for {{ note.title }}</h1>
-    {% for type, questions in grouped_questions.items %}
+    {% for type, questions in questions_dict.items %}
         <h2>{{ type|title }}</h2>
         <ul>
             {% for question in questions %}
-            <li>{{ question.question_text }}<br></li>
+            <li>{{ question }}<br></li>
             {% endfor %}
         </ul>
     {% endfor %}

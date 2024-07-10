@@ -8,7 +8,7 @@ from openai import OpenAI
 import requests
 from django.shortcuts import render
 from .forms import SearchForm, NoteForm
-from .models import SearchResults, Note, Question
+from .models import SearchResults, Note, Question,  QuestionType, NoteQuestionType
 from dotenv import load_dotenv
 from django.shortcuts import render, redirect
 from django.conf import settings
@@ -54,8 +54,11 @@ def upload_note_view(request):
         form = NoteForm(request.POST, request.FILES)
         if form.is_valid():
             note = form.save()
-            process_note_file(note)
-            return redirect('generate_questions', note_id=note.id)
+            selected_question_types = request.POST.getlist('question_types')
+            for q_type_name in selected_question_types:
+                q_type, created = QuestionType.objects.get_or_create(name=q_type_name)
+                NoteQuestionType.objects.create(note=note, question_type=q_type)
+            return redirect('generate_questions', note_id = note.id)  # Redirect as appropriate
     else:
         form = NoteForm()
     return render(request, 'upload_note.html', {'form': form})
@@ -74,50 +77,84 @@ def process_note_file(note):
     elif file_ext in ['.txt']:
         with open(file_path, 'r') as file:
             text = file.read()
+    return text  # Ensure the function returns the extracted text
 
-    generate_questions(note, text)
 
-def generate_questions(note, text):
-    # response = openai.Completion.create(
-    #     engine="text-davinci-003",
-    #     prompt=f"Generate multiple-choice questions, true/false questions, and short answer questions based on the following text:\n\n{text}",
-    #     max_tokens=1000
-    # )
-
+def generate_questions(note, text, question_type):
     openai_api_key = os.getenv('OPENAI_API_KEY')
     client = OpenAI(api_key=openai_api_key)
-    response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                        {
-                            "role": "user",
-                            # "content":f"Generate multiple-choice questions, true/false questions, and short answer questions based on the following text:\n\n{text}",
-                            
-                            "content":f'''Imagine you are a subject tutor on this topic. 
-                            You are setting a test for a student on the subject.
-                            Generate multiple-choice questions, based on the following text:\n\n{text}''',
 
-                        },
-                    ],
-                    # max_tokens=2000
-                )
-    
+    # Adjust the prompt based on the question type
+    if question_type == 'multiple_choice':
+        prompt_content = f'''Imagine you are a subject tutor on this topic. 
+        You are setting a test for a student on the subject.
+        Generate multiple-choice questions based on the following text:\n\n{text}'''
+    elif question_type == 'true_false':
+        prompt_content = f'''Imagine you are a subject tutor on this topic. 
+        You are setting a test for a student on the subject.
+        Generate true/false questions based on the following text:\n\n{text}'''
+    elif question_type == 'short_answer':
+        prompt_content = f'''Imagine you are a subject tutor on this topic. 
+        You are setting a test for a student on the subject.
+        Generate short answer questions based on the following text:\n\n{text}'''
+    else:
+        raise ValueError("Unsupported question type")
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt_content,
+            },
+        ],
+    )
+
     print(response.choices[0].message.content)
-     
+
     questions_text = response.choices[0].message.content.strip().split('\n')
-    # questions_text = response.choices[0].text.strip().split('\n')
     for question in questions_text:
         if question.strip():
-            Question.objects.create(note=note, question_text=question.strip(), question_type='Mixed', difficulty='Medium')
+            # Save the question with its specified type
+            Question.objects.create(note=note, question_text=question.strip(), question_type=question_type, difficulty='Medium')
+
+def extract_text_from_note(note):
+    text = process_note_file(note)
+    return text
 
 def generate_questions_view(request, note_id):
     note = Note.objects.get(id=note_id)
-    questions = Question.objects.filter(note=note)
+    text = extract_text_from_note(note)
+    note_question_types = NoteQuestionType.objects.filter(note_id=note.id).order_by('question_type')
 
-    grouped_questions = {
-        'multiple_choice': [q for q in questions if q.type == 'multiple_choice'],
-        'true_false': [q for q in questions if q.type == 'true_false'],
-        'short_answer': [q for q in questions if q.type == 'short_answer'],
-    }
-    # return render(request, 'generate_questions.html', {'note': note, 'questions': questions})
-    return render(request, 'generate_questions.html', {'note': note, 'grouped_questions': grouped_questions})
+
+    for nqt in note_question_types:
+        print("test ", nqt)
+        fixed_question_type_id = nqt.question_type_id
+
+        question_type_name = QuestionType.objects.get(id=fixed_question_type_id).name
+        questions = generate_questions(note, text, question_type_name)
+        
+
+    questions_dict = {}
+    # Assuming you want to fetch and display questions after generation
+    questions = Question.objects.filter(note=note).order_by('question_type')
+    
+
+    for question in questions:
+        
+        question_type_name = QuestionType.objects.get(id=question.id).name
+        if question_type_name not in questions_dict:
+            questions_dict[question_type_name] = [question.question_text]  # Initialize with a list containing the question text
+        else:
+            #append to the existing key
+            questions_dict[question_type_name].append(question.question_text)
+        # final format
+        # {multiple_choice: [question1, question2], 
+        # true_false: [question1, question2]
+        # short_answer: [question1, question2]}
+
+    return render(request, 'generate_questions.html', {
+        'note': note, 
+        'questions_dict': questions_dict
+    })

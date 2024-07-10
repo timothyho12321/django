@@ -2,17 +2,21 @@
 <html>
 <head>
     <title>Upload Note</title>
+     <!-- Include Bootstrap CSS -->
+     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
-<body>
-    <h1>Upload Note</h1>
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <label><input type="checkbox" name="question_types" value="multiple_choice"> Multiple Choice</label>
-    <label><input type="checkbox" name="question_types" value="true_false"> True/False</label>
-    <label><input type="checkbox" name="question_types" value="short_answer"> Short Answer</label>
-    <button type="submit">Upload</button>
-        <button type="submit">Upload</button>
-    </form>
+<body class="border">
+    <div class="container mt-2">
+        <h1>Upload Note</h1>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <label><input type="checkbox" name="question_types" value="multiple_choice"> Multiple Choice</label>
+                <label><input type="checkbox" name="question_types" value="true_false"> True/False</label>
+                <label><input type="checkbox" name="question_types" value="short_answer"> Short Answer</label>
+                </br>
+                <button type="submit" class="btn btn-primary mt-2">Upload</button>
+            </form>
+    </div>
 </body>
 </html>

@@ -21,22 +21,25 @@ class Note(models.Model):
 
     def __str__(self):
         return self.title
-
-class Question(models.Model):
-    note = models.ForeignKey(Note, on_delete=models.CASCADE)
-    question_text = models.TextField()
-    question_type = models.CharField(max_length=50)
-    difficulty = models.CharField(max_length=50)
-
-    def __str__(self):
-        return f'{self.question_type}: {self.question_text}'
     
+#  list of questions names
 class QuestionType(models.Model):
     name = models.CharField(max_length=100)
 
     def __str__(self):
         return self.name
     
+# one to many, one question can have only one question type
+class Question(models.Model):
+    question_text = models.TextField()
+    difficulty = models.CharField(max_length=50)
+    note = models.ForeignKey(Note, on_delete=models.CASCADE)
+    question_type = models.ForeignKey(QuestionType, on_delete=models.CASCADE)  # Changed from CharField to ForeignKey
+    
+    def __str__(self):
+        return f'{self.question_type}: {self.question_text}'
+    
+# many to many, one note can have multiple question types
 class NoteQuestionType(models.Model):
     note = models.ForeignKey(Note, on_delete=models.CASCADE)
     question_type = models.ForeignKey(QuestionType, on_delete=models.CASCADE)
