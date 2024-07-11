@@ -61,7 +61,12 @@ def upload_note_view(request):
             return redirect('generate_questions', note_id = note.id)  # Redirect as appropriate
     else:
         form = NoteForm()
-    return render(request, 'upload_note.html', {'form': form})
+        existing_question_types = QuestionType.objects.all()
+    return render(request, 'upload_note.html', 
+                  {'form': form,
+                   'existing_question_types': existing_question_types
+                   
+                   })
 
 def process_note_file(note):
     text = ''
@@ -80,20 +85,20 @@ def process_note_file(note):
     return text  # Ensure the function returns the extracted text
 
 
-def generate_questions(note, text, question_type):
+def generate_questions(note, text, question_type, question_type_id):
     openai_api_key = os.getenv('OPENAI_API_KEY')
     client = OpenAI(api_key=openai_api_key)
 
     # Adjust the prompt based on the question type
-    if question_type == 'multiple_choice':
+    if question_type == 'multiple choice':
         prompt_content = f'''Imagine you are a subject tutor on this topic. 
         You are setting a test for a student on the subject.
         Generate multiple-choice questions based on the following text:\n\n{text}'''
-    elif question_type == 'true_false':
+    elif question_type == 'true false':
         prompt_content = f'''Imagine you are a subject tutor on this topic. 
         You are setting a test for a student on the subject.
         Generate true/false questions based on the following text:\n\n{text}'''
-    elif question_type == 'short_answer':
+    elif question_type == 'short answer':
         prompt_content = f'''Imagine you are a subject tutor on this topic. 
         You are setting a test for a student on the subject.
         Generate short answer questions based on the following text:\n\n{text}'''
@@ -113,10 +118,13 @@ def generate_questions(note, text, question_type):
     print(response.choices[0].message.content)
 
     questions_text = response.choices[0].message.content.strip().split('\n')
+    # print("check ", question_type_id)
+    question_type_instance = QuestionType.objects.get(id=question_type_id)
+    print("check2 ", question_type_instance.id)
     for question in questions_text:
         if question.strip():
             # Save the question with its specified type
-            Question.objects.create(note=note, question_text=question.strip(), question_type=question_type, difficulty='Medium')
+            Question.objects.create(note=note, question_text=question.strip(), question_type=question_type_instance, difficulty='Medium')
 
 def extract_text_from_note(note):
     text = process_note_file(note)
@@ -125,7 +133,7 @@ def extract_text_from_note(note):
 def generate_questions_view(request, note_id):
     note = Note.objects.get(id=note_id)
     text = extract_text_from_note(note)
-    note_question_types = NoteQuestionType.objects.filter(note_id=note.id).order_by('question_type')
+    note_question_types = NoteQuestionType.objects.filter(note_id=note.id).order_by('question_type_id')
 
 
     for nqt in note_question_types:
@@ -133,17 +141,18 @@ def generate_questions_view(request, note_id):
         fixed_question_type_id = nqt.question_type_id
 
         question_type_name = QuestionType.objects.get(id=fixed_question_type_id).name
-        questions = generate_questions(note, text, question_type_name)
+        questions = generate_questions(note, text, question_type_name,fixed_question_type_id)
         
 
     questions_dict = {}
     # Assuming you want to fetch and display questions after generation
-    questions = Question.objects.filter(note=note).order_by('question_type')
+    questions = Question.objects.filter(note=note_id).order_by('question_type')
     
 
     for question in questions:
-        
-        question_type_name = QuestionType.objects.get(id=question.id).name
+        print("test2 ", question.question_type_id)
+        question_type = QuestionType.objects.get(id=question.question_type_id)
+        question_type_name = question_type.name
         if question_type_name not in questions_dict:
             questions_dict[question_type_name] = [question.question_text]  # Initialize with a list containing the question text
         else:

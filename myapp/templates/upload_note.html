@@ -11,9 +11,11 @@
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.as_p }}
-                <label><input type="checkbox" name="question_types" value="multiple_choice"> Multiple Choice</label>
-                <label><input type="checkbox" name="question_types" value="true_false"> True/False</label>
-                <label><input type="checkbox" name="question_types" value="short_answer"> Short Answer</label>
+
+                {% for question in existing_question_types %}
+                <label><input type="checkbox" name="question_types" value="{{question.name}}"> {{question.name}}</label>
+                {% endfor %}    
+            
                 </br>
                 <button type="submit" class="btn btn-primary mt-2">Upload</button>
             </form>
