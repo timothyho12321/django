@@ -150,7 +150,7 @@ def generate_questions_view(request, note_id):
     
 
     for question in questions:
-        print("test2 ", question.question_type_id)
+        # print("test2 ", question.question_type_id)
         question_type = QuestionType.objects.get(id=question.question_type_id)
         question_type_name = question_type.name
         if question_type_name not in questions_dict:
